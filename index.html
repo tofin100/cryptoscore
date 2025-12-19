@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MicroCap VC Scanner — 100x Discovery</title>
-  <meta name="description" content="MicroCap VC Scanner: finde asymmetrische Microcaps (Tokenomics + Liquidity + Momentum) über CoinGecko." />
+  <title>Crypto WebApp — Kraken + VC Microcap Scanner</title>
+  <meta name="description" content="WebApp: Kraken Market Scanner + VC Microcap Discovery Scanner (CoinGecko) in einer Oberfläche." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -16,96 +16,98 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="logo">VC</div>
+      <div class="logo">FG</div>
       <div class="brandText">
-        <div class="brandTitle">MicroCap VC Scanner</div>
-        <div class="brandSub">CoinGecko • Asymmetry + Liquidity + Momentum (Root-only)</div>
+        <div class="brandTitle">Crypto WebApp</div>
+        <div class="brandSub">Kraken Scanner + VC Microcap Discovery</div>
       </div>
     </div>
 
     <div class="topActions">
-      <button id="btnReload" class="btn primary">Scan</button>
+      <button id="btnModeKraken" class="btn ghost">Kraken</button>
+      <button id="btnModeVC" class="btn ghost">VC Microcaps</button>
+      <button id="btnRefresh" class="btn primary">Refresh</button>
     </div>
   </header>
 
   <main class="container">
-    <section class="hero">
-      <div class="heroCard">
-        <div class="heroHeader">
-          <div>
-            <div class="heroTitle">Ziel</div>
-            <div class="heroHint">Microcaps finden, die überhaupt 10–100x-fähig sind (VC-Due-Diligence-Score).</div>
-          </div>
-          <div id="statusPill" class="pill">Ready</div>
+
+    <!-- MODE: KRAKEN -->
+    <section id="viewKraken" class="panel">
+      <div class="panelHead">
+        <div>
+          <h2 class="panelTitle">Kraken Scanner</h2>
+          <div class="panelSub">Price/Volume/Returns (bestehender Modus). Wenn du willst, erweitern wir später um EMAs/RSI/ATR.</div>
         </div>
-
-        <div class="kpis">
-          <div class="kpi">
-            <div class="kpiLabel">Universe</div>
-            <div id="kpiUniverse" class="kpiValue">—</div>
-            <div class="kpiHint">Coins im Scan</div>
-          </div>
-          <div class="kpi">
-            <div class="kpiLabel">Filters</div>
-            <div id="kpiFilters" class="kpiValue">—</div>
-            <div class="kpiHint">MC / Vol / FDV</div>
-          </div>
-          <div class="kpi">
-            <div class="kpiLabel">Last Update</div>
-            <div id="kpiUpdated" class="kpiValue">—</div>
-            <div class="kpiHint">UTC</div>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="mini">
-          <div class="miniTitle">Wie du das liest</div>
-          <div class="miniText">
-            <b>VC Score</b> = Asymmetry (Supply/FDV/MC) + Liquidity (Vol/MC) + Timing (Momentum) − Risiko (ATH/Dead).<br/>
-            <b>Wichtig:</b> Das ist Discovery. Danach kommt manuelle Due Diligence (Team, Produkt, Unlocks, Konkurrenz).
-          </div>
+        <div class="panelRight">
+          <div id="krakenErrors" class="errors" aria-live="polite"></div>
         </div>
       </div>
 
-      <div class="heroCard">
-        <div class="heroHeader">
-          <div>
-            <div class="heroTitle">Filter</div>
-            <div class="heroHint">Brutal filtern, sonst findest du nur Müll.</div>
-          </div>
-          <div id="errors" class="errors" aria-live="polite"></div>
-        </div>
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Asset</th>
+              <th>Score</th>
+              <th>Return 7D</th>
+              <th>Return 30D</th>
+              <th>Vol-Impuls</th>
+              <th>Price</th>
+              <th>24h Vol (approx)</th>
+            </tr>
+          </thead>
+          <tbody id="krakenRows">
+            <tr><td colspan="8" class="loadingRow">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
+    <!-- MODE: VC MICROCAPS -->
+    <section id="viewVC" class="panel" style="display:none;">
+      <div class="panelHead">
+        <div>
+          <h2 class="panelTitle">VC Microcap Scanner</h2>
+          <div class="panelSub">
+            Ziel: Microcaps mit 10–100x-Potenzial finden via <b>Asymmetry (MC/FDV/Circ%)</b> + <b>Liquidity</b> + <b>Timing</b>.
+          </div>
+        </div>
+        <div class="panelRight">
+          <div id="vcErrors" class="errors" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="heroCard" style="margin-bottom:12px;">
         <div class="controlsGrid">
           <div class="control">
-            <label class="label">Market Cap max</label>
-            <input id="mcMax" class="input" type="number" step="1000000" />
+            <label class="label">MC min</label>
+            <input id="vcMcMin" class="input" type="number" step="100000" />
           </div>
           <div class="control">
-            <label class="label">Market Cap min</label>
-            <input id="mcMin" class="input" type="number" step="100000" />
+            <label class="label">MC max</label>
+            <input id="vcMcMax" class="input" type="number" step="1000000" />
           </div>
           <div class="control">
-            <label class="label">24h Volume min</label>
-            <input id="volMin" class="input" type="number" step="10000" />
+            <label class="label">24h Vol min</label>
+            <input id="vcVolMin" class="input" type="number" step="10000" />
           </div>
           <div class="control">
             <label class="label">FDV/MC max</label>
-            <input id="fdvMcMax" class="input" type="number" step="0.1" />
+            <input id="vcFdvMcMax" class="input" type="number" step="0.1" />
           </div>
           <div class="control">
-            <label class="label">Min VC Score</label>
-            <input id="minScore" class="input" type="number" min="0" max="100" step="1" />
+            <label class="label">Min Score</label>
+            <input id="vcMinScore" class="input" type="number" min="0" max="100" step="1" />
           </div>
           <div class="control">
             <label class="label">Suche</label>
-            <input id="search" class="input" placeholder="z.B. ondo, pendle, inj…" />
+            <input id="vcSearch" class="input" placeholder="z.B. ondo, pendle, inj…" />
           </div>
-
           <div class="control" style="grid-column: 1 / -1;">
             <label class="label">Sortierung</label>
-            <select id="sort" class="select">
+            <select id="vcSort" class="select">
               <option value="score">VC Score (desc)</option>
               <option value="mc">Market Cap (asc)</option>
               <option value="volmc">Vol/MC (desc)</option>
@@ -117,16 +119,7 @@
         </div>
 
         <div class="note">
-          Tipp: Für „echte Microcaps“ setze MC max z.B. auf 300M und Vol min z.B. auf 500k–2M.
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panelHead">
-        <div>
-          <h2 class="panelTitle">Ranking</h2>
-          <div class="panelSub">Quelle: CoinGecko markets (USD). Optional: narratives.json für manuelle Narrative-Tags.</div>
+          Microcap-Defaults sind sinnvoll gesetzt. Wenn CoinGecko mal zickt: Refresh nochmal drücken.
         </div>
       </div>
 
@@ -152,16 +145,13 @@
               <th>Preis</th>
             </tr>
           </thead>
-          <tbody id="rows">
-            <tr><td colspan="16" class="loadingRow">Klicke „Scan“…</td></tr>
+          <tbody id="vcRows">
+            <tr><td colspan="16" class="loadingRow">Klicke Refresh…</td></tr>
           </tbody>
         </table>
       </div>
-
-      <div class="footerHint">
-        <span class="muted">Hinweis: CoinGecko hat Rate-Limits. Wenn du zu viele Coins scannst, reduziere „perPage“ in config.js.</span>
-      </div>
     </section>
+
   </main>
 
   <script src="./config.js"></script>
