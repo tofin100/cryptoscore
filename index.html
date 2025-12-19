@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CryptoScore — Kraken Radar</title>
+  <meta name="description" content="CryptoScore: Score & Ranking von Krypto-Assets basierend auf Kraken Marktdaten (MVP)." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <div class="bgOrbs" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">CS</div>
+      <div class="brandText">
+        <div class="brandTitle">CryptoScore</div>
+        <div class="brandSub">Kraken Radar • Score & Momentum • MVP</div>
+      </div>
+    </div>
+
+    <div class="topActions">
+      <button id="btnEditWatchlist" class="btn ghost" title="Watchlist bearbeiten">
+        Watchlist
+      </button>
+      <button id="btnRefresh" class="btn primary" title="Daten neu laden">
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="heroCard">
+        <div class="heroHeader">
+          <div>
+            <div class="heroTitle">Market Regime</div>
+            <div class="heroHint">BTC Trend (Daily) + Dominanz-Proxy (MVP)</div>
+          </div>
+          <div id="statusPill" class="pill">Loading…</div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpiLabel">BTC 30D</div>
+            <div id="kpiBtc30" class="kpiValue">—</div>
+            <div id="kpiBtc30Hint" class="kpiHint">Daily close vs 30d ago</div>
+          </div>
+          <div class="kpi">
+            <div class="kpiLabel">Regime</div>
+            <div id="kpiRegime" class="kpiValue">—</div>
+            <div id="kpiRegimeHint" class="kpiHint">Wird aus BTC Trend abgeleitet</div>
+          </div>
+          <div class="kpi">
+            <div class="kpiLabel">Last Update</div>
+            <div id="kpiUpdated" class="kpiValue">—</div>
+            <div class="kpiHint">UTC</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="heroFooter">
+          <div class="mini">
+            <div class="miniTitle">MVP-Score</div>
+            <div class="miniText">
+              Score basiert auf <b>Relative Strength vs BTC</b>, <b>7d/30d Momentum</b> und <b>Volumen-Impuls</b>.
+              Tokenomics, On-Chain, Narrativ kommen als Layer danach.
+            </div>
+          </div>
+
+          <div class="mini">
+            <div class="miniTitle">Top Candidate</div>
+            <div id="topCandidate" class="miniBig">—</div>
+            <div id="topCandidateHint" class="miniText">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="heroCard">
+        <div class="heroHeader">
+          <div>
+            <div class="heroTitle">Controls</div>
+            <div class="heroHint">Sortieren, filtern, Scores vergleichen</div>
+          </div>
+        </div>
+
+        <div class="controlsGrid">
+          <div class="control">
+            <label class="label" for="sortSelect">Sortierung</label>
+            <select id="sortSelect" class="select">
+              <option value="score">Score (desc)</option>
+              <option value="rs30">RS vs BTC 30D (desc)</option>
+              <option value="ret30">Return 30D (desc)</option>
+              <option value="ret7">Return 7D (desc)</option>
+              <option value="volImpulse">Vol-Impuls (desc)</option>
+              <option value="symbol">Symbol (A→Z)</option>
+            </select>
+          </div>
+
+          <div class="control">
+            <label class="label" for="minScore">Min Score</label>
+            <input id="minScore" class="input" type="number" min="0" max="100" step="1" value="0" />
+          </div>
+
+          <div class="control">
+            <label class="label" for="search">Suche</label>
+            <input id="search" class="input" placeholder="z.B. SOL, LINK, AVAX…" />
+          </div>
+
+          <div class="control">
+            <label class="label" for="autoRefresh">Auto Refresh</label>
+            <div class="toggleRow">
+              <input id="autoRefresh" type="checkbox" />
+              <span class="toggleHint">alle <span id="autoRefreshMins">10</span> min</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          Tipp: Starte mit 10–25 Coins in der Watchlist. Das ist schnell, sauber und aussagekräftig.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panelHead">
+        <div>
+          <h2 class="panelTitle">Ranking</h2>
+          <div class="panelSub">
+            Datenquelle: Kraken Public REST (OHLC Daily + Ticker). Score = Momentum + RS + Volumen-Impuls (MVP).
+          </div>
+        </div>
+
+        <div class="panelRight">
+          <div id="errors" class="errors" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" aria-label="CryptoScore Ranking Table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Asset</th>
+              <th>Score</th>
+              <th>RS vs BTC (30D)</th>
+              <th>Return 7D</th>
+              <th>Return 30D</th>
+              <th>Vol-Impuls</th>
+              <th>Price</th>
+              <th>24h Vol (approx)</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr>
+              <td colspan="9" class="loadingRow">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="footerHint">
+        <span class="muted">
+          *Vol-Impuls = 24h Vol (Kraken Ticker) relativ zur 30D-Durchschnitts-Daily-Volume aus OHLC (MVP-Proxy).
+        </span>
+      </div>
+    </section>
+  </main>
+
+  <!-- Watchlist Modal -->
+  <dialog id="watchlistModal" class="modal">
+    <form method="dialog" class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="modalTitle">Watchlist bearbeiten</div>
+          <div class="modalSub">
+            Ein Symbol pro Zeile. Format: <b>SYMBOL</b> oder <b>SYMBOL=KRAKENPAIR</b><br/>
+            Beispiel: <code>SOL=SOLUSD</code> oder <code>BTC=XXBTZUSD</code>
+          </div>
+        </div>
+        <button class="iconBtn" value="cancel" aria-label="Schließen">✕</button>
+      </div>
+
+      <textarea id="watchlistTextarea" class="textarea" spellcheck="false"></textarea>
+
+      <div class="modalActions">
+        <button id="btnResetWatchlist" class="btn ghost" value="cancel" type="button">Reset</button>
+        <button id="btnSaveWatchlist" class="btn primary" value="default" type="button">Save</button>
+      </div>
+
+      <div class="modalFoot">
+        Speichert in <b>localStorage</b> (nur in deinem Browser). Für Repo-Defaults ändere <code>config.js</code>.
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
