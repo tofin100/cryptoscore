@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Crypto WebApp — Kraken + VC Microcap Scanner</title>
-  <meta name="description" content="WebApp: Kraken Market Scanner + VC Microcap Discovery Scanner (CoinGecko) in einer Oberfläche." />
+  <meta name="description" content="WebApp: Kraken Scanner + VC Microcap Discovery (kostenlos via CoinPaprika) in einer Oberfläche." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
       <div class="logo">FG</div>
       <div class="brandText">
         <div class="brandTitle">Crypto WebApp</div>
-        <div class="brandSub">Kraken Scanner + VC Microcap Discovery</div>
+        <div class="brandSub">Kraken Scanner + VC Microcap Discovery (Free)</div>
       </div>
     </div>
 
@@ -32,12 +32,12 @@
 
   <main class="container">
 
-    <!-- MODE: KRAKEN -->
+    <!-- KRAKEN VIEW -->
     <section id="viewKraken" class="panel">
       <div class="panelHead">
         <div>
           <h2 class="panelTitle">Kraken Scanner</h2>
-          <div class="panelSub">Price/Volume/Returns (bestehender Modus). Wenn du willst, erweitern wir später um EMAs/RSI/ATR.</div>
+          <div class="panelSub">Watchlist-Scan (Returns + Volumen-Impuls + einfacher Score).</div>
         </div>
         <div class="panelRight">
           <div id="krakenErrors" class="errors" aria-live="polite"></div>
@@ -63,15 +63,19 @@
           </tbody>
         </table>
       </div>
+
+      <div class="footerHint">
+        <span class="muted">Tipp: Wenn du willst, bauen wir als nächstes EMAs/RSI/ATR direkt aus OHLC in diesen Modus.</span>
+      </div>
     </section>
 
-    <!-- MODE: VC MICROCAPS -->
+    <!-- VC VIEW -->
     <section id="viewVC" class="panel" style="display:none;">
       <div class="panelHead">
         <div>
           <h2 class="panelTitle">VC Microcap Scanner</h2>
           <div class="panelSub">
-            Ziel: Microcaps mit 10–100x-Potenzial finden via <b>Asymmetry (MC/FDV/Circ%)</b> + <b>Liquidity</b> + <b>Timing</b>.
+            Ziel: Microcaps finden, die überhaupt 10–100x-fähig sein können: <b>Asymmetry (MC/Supply)</b> + <b>Liquidity</b> + <b>Timing</b> − <b>Risk</b>.
           </div>
         </div>
         <div class="panelRight">
@@ -82,44 +86,43 @@
       <div class="heroCard" style="margin-bottom:12px;">
         <div class="controlsGrid">
           <div class="control">
-            <label class="label">MC min</label>
+            <label class="label">MC min (USD)</label>
             <input id="vcMcMin" class="input" type="number" step="100000" />
           </div>
           <div class="control">
-            <label class="label">MC max</label>
+            <label class="label">MC max (USD)</label>
             <input id="vcMcMax" class="input" type="number" step="1000000" />
           </div>
           <div class="control">
-            <label class="label">24h Vol min</label>
+            <label class="label">24h Vol min (USD)</label>
             <input id="vcVolMin" class="input" type="number" step="10000" />
           </div>
           <div class="control">
-            <label class="label">FDV/MC max</label>
-            <input id="vcFdvMcMax" class="input" type="number" step="0.1" />
-          </div>
-          <div class="control">
-            <label class="label">Min Score</label>
+            <label class="label">Min VC Score</label>
             <input id="vcMinScore" class="input" type="number" min="0" max="100" step="1" />
           </div>
+
           <div class="control">
             <label class="label">Suche</label>
             <input id="vcSearch" class="input" placeholder="z.B. ondo, pendle, inj…" />
           </div>
-          <div class="control" style="grid-column: 1 / -1;">
+
+          <div class="control">
             <label class="label">Sortierung</label>
             <select id="vcSort" class="select">
               <option value="score">VC Score (desc)</option>
               <option value="mc">Market Cap (asc)</option>
               <option value="volmc">Vol/MC (desc)</option>
-              <option value="fdvmc">FDV/MC (asc)</option>
               <option value="chg7">Change 7d (desc)</option>
               <option value="chg30">Change 30d (desc)</option>
+              <option value="liquidity">Liquidity Score (desc)</option>
+              <option value="asym">Asymmetry Score (desc)</option>
             </select>
           </div>
         </div>
 
         <div class="note">
-          Microcap-Defaults sind sinnvoll gesetzt. Wenn CoinGecko mal zickt: Refresh nochmal drücken.
+          Dieses v1 nutzt nur kostenlos verfügbare Daten (MarketCap, Volume, Supply, 7d/30d). Danach bauen wir “Narrative/Tokenomics/Unlock-Risk” als zweiten Layer.
         </div>
       </div>
 
@@ -135,20 +138,22 @@
               <th>Timing</th>
               <th>Risk</th>
               <th>MC</th>
-              <th>FDV</th>
-              <th>FDV/MC</th>
+              <th>Max Supply</th>
               <th>Circ%</th>
               <th>Vol/MC</th>
               <th>Chg 7d</th>
               <th>Chg 30d</th>
-              <th>ATH Δ</th>
               <th>Preis</th>
             </tr>
           </thead>
           <tbody id="vcRows">
-            <tr><td colspan="16" class="loadingRow">Klicke Refresh…</td></tr>
+            <tr><td colspan="14" class="loadingRow">Loading…</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="footerHint">
+        <span class="muted">Wenn du Microcaps “noch kleiner” willst: MC max runter (z.B. 80M) und Vol min rauf (z.B. 1M).</span>
       </div>
     </section>
 
