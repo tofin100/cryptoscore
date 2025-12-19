@@ -1,43 +1,28 @@
-/**
- * CryptoScore Config (ROOT ONLY)
- * - WATCHLIST: Liste der Assets, die gerankt werden
- * - Du kannst die Watchlist später im UI ändern (localStorage)
- */
-
-window.CRYPTOSCORE_CONFIG = {
-  APP: {
-    autoRefreshMinutes: 10,
-    quote: "USD",
-
-    // OHLC intervals in minutes
-    dailyInterval: 1440,     // 1D (Regime + Returns)
-    breakoutInterval: 240,   // 4H (CHOCH/BOS)
-
-    // Lookbacks
-    lookbackDaysDaily: 31,   // min für 30D Return
-    lookbackCandles4H: 180,  // ~30 Tage 4H (180*4h=720h)
-
-    // Pivot / Structure detection
-    pivotLeft: 2,
-    pivotRight: 2,
-
-    // Compression (ATR drop)
-    compressionAtrDrop: 0.25, // ATR recent < ATR earlier*(1-0.25)
-
-    // Rate limiting
-    maxConcurrentRequests: 4,
+window.VC_CONFIG = {
+  api: {
+    coingeckoBase: "https://api.coingecko.com/api/v3",
+    vsCurrency: "usd",
   },
 
-  WATCHLIST: [
-    { symbol: "BTC", pair: "XXBTZUSD" },
-    { symbol: "ETH", pair: "XETHZUSD" },
+  scan: {
+    // Universe Size: je größer, desto eher Rate Limit.
+    pages: 2,          // 2 Seiten * perPage Coins
+    perPage: 100,      // max 250 (CoinGecko), aber RateLimit beachten
 
-    { symbol: "SOL", pair: "SOLUSD" },
-    { symbol: "LINK", pair: "LINKUSD" },
-    { symbol: "AVAX", pair: "AVAXUSD" },
-    { symbol: "INJ", pair: "INJUSD" },
+    // Default Filter (Microcap Fokus)
+    marketCapMin: 5_000_000,     // 5M
+    marketCapMax: 300_000_000,   // 300M
+    volume24hMin: 500_000,       // 500k
+    fdvMcMax: 6.0,               // FDV/MC max
 
-    { symbol: "ADA", pair: "ADAUSD" },
-    { symbol: "DOT", pair: "DOTUSD" },
-  ],
+    minScore: 60,
+  },
+
+  // Weighting (VC Score)
+  weights: {
+    asym: 0.40,
+    liq: 0.30,
+    timing: 0.20,
+    risk: 0.10, // risk is penalty internally
+  }
 };
