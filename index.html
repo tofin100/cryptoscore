@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CryptoScore — Kraken Radar</title>
-  <meta name="description" content="CryptoScore: Score & Ranking von Krypto-Assets basierend auf Kraken Marktdaten (MVP)." />
+  <title>CryptoScore — Kraken Breakout Radar</title>
+  <meta name="description" content="CryptoScore: Score & Breakout-Readiness (BOS/CHOCH) basierend auf Kraken Marktdaten." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
@@ -19,7 +19,7 @@
       <div class="logo">CS</div>
       <div class="brandText">
         <div class="brandTitle">CryptoScore</div>
-        <div class="brandSub">Kraken Radar • Score & Momentum • MVP</div>
+        <div class="brandSub">Kraken • Market Score + Breakout Readiness (BRS)</div>
       </div>
     </div>
 
@@ -39,7 +39,7 @@
         <div class="heroHeader">
           <div>
             <div class="heroTitle">Market Regime</div>
-            <div class="heroHint">BTC Trend (Daily) + Dominanz-Proxy (MVP)</div>
+            <div class="heroHint">BTC Trend (Daily) + Risiko-Modus (MVP)</div>
           </div>
           <div id="statusPill" class="pill">Loading…</div>
         </div>
@@ -66,10 +66,10 @@
 
         <div class="heroFooter">
           <div class="mini">
-            <div class="miniTitle">MVP-Score</div>
+            <div class="miniTitle">Was du hier siehst</div>
             <div class="miniText">
-              Score basiert auf <b>Relative Strength vs BTC</b>, <b>7d/30d Momentum</b> und <b>Volumen-Impuls</b>.
-              Tokenomics, On-Chain, Narrativ kommen als Layer danach.
+              <b>Score</b> = Momentum/RS/Volumen (wer ist gerade stark).<br/>
+              <b>BRS</b> = Breakout-Readiness (CHOCH/BOS/Kompression) → wer ist „bereit“, bevor es abgeht.
             </div>
           </div>
 
@@ -85,7 +85,7 @@
         <div class="heroHeader">
           <div>
             <div class="heroTitle">Controls</div>
-            <div class="heroHint">Sortieren, filtern, Scores vergleichen</div>
+            <div class="heroHint">Sortieren, filtern, Fokus setzen</div>
           </div>
         </div>
 
@@ -93,13 +93,19 @@
           <div class="control">
             <label class="label" for="sortSelect">Sortierung</label>
             <select id="sortSelect" class="select">
-              <option value="score">Score (desc)</option>
+              <option value="brs">BRS (desc) — Breakout</option>
+              <option value="score">Score (desc) — Momentum</option>
               <option value="rs30">RS vs BTC 30D (desc)</option>
               <option value="ret30">Return 30D (desc)</option>
               <option value="ret7">Return 7D (desc)</option>
               <option value="volImpulse">Vol-Impuls (desc)</option>
               <option value="symbol">Symbol (A→Z)</option>
             </select>
+          </div>
+
+          <div class="control">
+            <label class="label" for="minBRS">Min BRS</label>
+            <input id="minBRS" class="input" type="number" min="0" max="100" step="1" value="0" />
           </div>
 
           <div class="control">
@@ -122,7 +128,7 @@
         </div>
 
         <div class="note">
-          Tipp: Starte mit 10–25 Coins in der Watchlist. Das ist schnell, sauber und aussagekräftig.
+          Tipp: Sortiere nach <b>BRS</b>, um frühe Struktur-Setups zu sehen. Sortiere nach <b>Score</b>, wenn du bestätigtes Momentum willst.
         </div>
       </div>
     </section>
@@ -132,7 +138,7 @@
         <div>
           <h2 class="panelTitle">Ranking</h2>
           <div class="panelSub">
-            Datenquelle: Kraken Public REST (OHLC Daily + Ticker). Score = Momentum + RS + Volumen-Impuls (MVP).
+            Daten: Kraken Public REST (OHLC Daily + OHLC 4H + Ticker). BRS = CHOCH/BOS/Kompression (4H).
           </div>
         </div>
 
@@ -148,6 +154,8 @@
               <th>#</th>
               <th>Asset</th>
               <th>Score</th>
+              <th>BRS</th>
+              <th>Signals (4H)</th>
               <th>RS vs BTC (30D)</th>
               <th>Return 7D</th>
               <th>Return 30D</th>
@@ -158,7 +166,7 @@
           </thead>
           <tbody id="rows">
             <tr>
-              <td colspan="9" class="loadingRow">Loading…</td>
+              <td colspan="11" class="loadingRow">Loading…</td>
             </tr>
           </tbody>
         </table>
@@ -166,7 +174,7 @@
 
       <div class="footerHint">
         <span class="muted">
-          *Vol-Impuls = 24h Vol (Kraken Ticker) relativ zur 30D-Durchschnitts-Daily-Volume aus OHLC (MVP-Proxy).
+          *BRS v1 nutzt 4H-Structure (CHOCH/BOS), ATR-Kompression (Proxy) und optional Vol-Impuls. Daily-Regime kommt über BTC 30D.
         </span>
       </div>
     </section>
@@ -194,7 +202,7 @@
       </div>
 
       <div class="modalFoot">
-        Speichert in <b>localStorage</b> (nur in deinem Browser). Für Repo-Defaults ändere <code>config.js</code>.
+        Speichert in <b>localStorage</b>. Repo-Defaults in <code>config.js</code>.
       </div>
     </form>
   </dialog>
