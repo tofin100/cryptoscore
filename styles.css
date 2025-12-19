@@ -266,7 +266,7 @@ body{
   font-size: 12px;
   color: rgba(251,113,133,.9);
   text-align:right;
-  max-width: 420px;
+  max-width: 520px;
 }
 
 .tableWrap{
@@ -277,7 +277,7 @@ body{
 .table{
   width:100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 1180px;
   background: rgba(0,0,0,.18);
 }
 .table thead th{
@@ -325,6 +325,23 @@ body{
 .muted{ color: var(--muted); }
 .pos{ color: rgba(74,222,128,.95); }
 .neg{ color: rgba(251,113,133,.95); }
+
+.signalPill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  font-size: 12px;
+  color: rgba(255,255,255,.78);
+  margin-right: 6px;
+}
+.signalPill.up{ border-color: rgba(74,222,128,.28); }
+.signalPill.down{ border-color: rgba(251,113,133,.28); }
+.signalPill.comp{ border-color: rgba(216,180,106,.28); }
+.signalPill.vol{ border-color: rgba(98,230,255,.28); }
 
 .footerHint{
   margin-top: 10px;
