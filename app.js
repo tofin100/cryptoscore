@@ -1,12 +1,12 @@
-/* CryptoScore — Kraken Radar (Root-only)
- * Public Kraken REST API:
- * - OHLC:   https://api.kraken.com/0/public/OHLC?pair=XXBTZUSD&interval=1440
- * - Ticker: https://api.kraken.com/0/public/Ticker?pair=XXBTZUSD
+/* CryptoScore — Kraken Breakout Radar (ROOT ONLY)
+ * Data:
+ * - OHLC Daily (interval=1440)
+ * - OHLC 4H   (interval=240)
+ * - Ticker    (live last + 24h volume)
  *
- * MVP Score:
- * - RS30 vs BTC (coin 30D - BTC 30D)
- * - Momentum (7D + 30D)
- * - Volume impulse: 24h vol proxy / avg daily volume (last 30 daily candles)
+ * Outputs:
+ * - Score (Market Strength): RS vs BTC + 7D/30D Momentum + Volume Impulse
+ * - BRS (Breakout Readiness): CHOCH/BOS (4H) + Compression (ATR drop) + optional VOL confirmation
  */
 
 (() => {
@@ -20,6 +20,7 @@
     btnEditWatchlist: document.getElementById("btnEditWatchlist"),
     sortSelect: document.getElementById("sortSelect"),
     minScore: document.getElementById("minScore"),
+    minBRS: document.getElementById("minBRS"),
     search: document.getElementById("search"),
     statusPill: document.getElementById("statusPill"),
     errors: document.getElementById("errors"),
@@ -58,10 +59,9 @@
   };
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
   const classForSigned = (x) => (x >= 0 ? "pos" : "neg");
 
-  // Simple z-score-ish mapping for “score” components
+  // mapping -> 0..100
   const scoreFromRange = (x, lo, hi) => {
     if (!Number.isFinite(x)) return 0;
     return clamp((x - lo) / (hi - lo), 0, 1) * 100;
@@ -84,13 +84,8 @@
     }
   }
 
-  function setWatchlist(arr) {
-    localStorage.setItem(LS_KEY, JSON.stringify(arr));
-  }
-
-  function resetWatchlist() {
-    localStorage.removeItem(LS_KEY);
-  }
+  function setWatchlist(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+  function resetWatchlist() { localStorage.removeItem(LS_KEY); }
 
   // ---------- Kraken API ----------
   const KRAKEN = "https://api.kraken.com/0/public";
@@ -99,19 +94,16 @@
     const res = await fetch(`${KRAKEN}/${path}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`Kraken HTTP ${res.status}`);
     const json = await res.json();
-    if (json.error && json.error.length) {
-      throw new Error(`Kraken error: ${json.error.join(", ")}`);
-    }
+    if (json.error && json.error.length) throw new Error(`Kraken error: ${json.error.join(", ")}`);
     return json.result;
   }
 
   async function fetchOHLC(pair, interval) {
     const result = await krakenGet(`OHLC?pair=${encodeURIComponent(pair)}&interval=${interval}`);
-    // result contains { <pairKey>: [...], last: <id> }
     const pairKey = Object.keys(result).find(k => k !== "last");
     const rows = result[pairKey];
-    // OHLC row format: [time, open, high, low, close, vwap, volume, count]
-    const candles = rows.map(r => ({
+    // row: [time, open, high, low, close, vwap, volume, count]
+    return rows.map(r => ({
       t: Number(r[0]),
       o: Number(r[1]),
       h: Number(r[2]),
@@ -119,16 +111,14 @@
       c: Number(r[4]),
       v: Number(r[6]),
     }));
-    return candles;
   }
 
   async function fetchTicker(pair) {
     const result = await krakenGet(`Ticker?pair=${encodeURIComponent(pair)}`);
     const pairKey = Object.keys(result)[0];
     const t = result[pairKey];
-    // last trade price = c[0], volume today = v[1] (24h) — base volume
-    const last = Number(t.c[0]);
-    const vol24hBase = Number(t.v[1]);
+    const last = Number(t.c[0]);     // last trade price
+    const vol24hBase = Number(t.v[1]); // 24h volume in base units
     return { last, vol24hBase };
   }
 
@@ -146,53 +136,39 @@
     return out;
   }
 
-  // ---------- Metrics ----------
-  function computeReturns(candles) {
-    // Need at least 31 daily closes for 30D return.
-    if (!candles || candles.length < 8) return { ret7: NaN, ret30: NaN, avgVol30: NaN, lastClose: NaN };
+  // ---------- Market metrics ----------
+  function computeReturnsDaily(candlesDaily) {
+    const arr = candlesDaily.slice().sort((a,b)=>a.t-b.t);
+    if (arr.length < 8) return { ret7: NaN, ret30: NaN, avgVol30: NaN, lastClose: NaN };
 
-    const sorted = candles.slice().sort((a,b) => a.t - b.t);
-    const last = sorted[sorted.length - 1];
-    const lastClose = last.c;
+    const lastClose = arr[arr.length - 1].c;
 
-    const c7 = sorted.length >= 8 ? sorted[sorted.length - 8].c : NaN;   // 7d ago close ~ 7 candles back
-    const c30 = sorted.length >= 31 ? sorted[sorted.length - 31].c : NaN;
+    const c7  = arr.length >= 8  ? arr[arr.length - 8].c  : NaN;
+    const c30 = arr.length >= 31 ? arr[arr.length - 31].c : NaN;
 
-    const ret7 = Number.isFinite(c7) ? (lastClose / c7 - 1) : NaN;
+    const ret7  = Number.isFinite(c7)  ? (lastClose / c7  - 1) : NaN;
     const ret30 = Number.isFinite(c30) ? (lastClose / c30 - 1) : NaN;
 
-    const last30 = sorted.slice(Math.max(0, sorted.length - 30));
-    const avgVol30 = last30.reduce((s,x) => s + (Number.isFinite(x.v) ? x.v : 0), 0) / (last30.length || 1);
+    const last30 = arr.slice(Math.max(0, arr.length - 30));
+    const avgVol30 = last30.reduce((s,x)=>s+(Number.isFinite(x.v)?x.v:0),0) / (last30.length || 1);
 
     return { ret7, ret30, avgVol30, lastClose };
   }
 
-  function computeScore(row, btc) {
-    // Inputs:
-    // - row.ret7, row.ret30
-    // - row.rs30 = ret30 - btc.ret30
-    // - volImpulse = (row.vol24hBase / row.avgVol30)
-    // Score design (MVP): keep bounded and interpretable.
-    const rs = row.rs30;                 // -? to +?
+  function computeMarketScore(row, btc) {
+    // Market behavior: RS vs BTC + momentum + volume impulse
+    const rs = row.rs30;
     const m30 = row.ret30;
     const m7 = row.ret7;
-    const vi = row.volImpulse;           // around ~0.5..3 typical
+    const vi = row.volImpulse;
 
-    // Map to 0..100 via ranges that “feel right” for crypto:
-    const sRS  = scoreFromRange(rs,  -0.35, 0.35);    // +/-35% vs BTC over 30D
-    const sM30 = scoreFromRange(m30, -0.30, 0.60);    // -30%..+60% in 30D
-    const sM7  = scoreFromRange(m7,  -0.15, 0.25);    // -15%..+25% in 7D
-    const sVI  = scoreFromRange(Math.log10(Math.max(0.001, vi)), -0.25, 0.55); // log scale
+    const sRS  = scoreFromRange(rs,  -0.35, 0.35);
+    const sM30 = scoreFromRange(m30, -0.30, 0.60);
+    const sM7  = scoreFromRange(m7,  -0.15, 0.25);
+    const sVI  = scoreFromRange(Math.log10(Math.max(0.001, vi)), -0.25, 0.55);
 
-    // Weighted blend (tweakable later)
-    const score = (
-      0.35 * sRS +
-      0.30 * sM30 +
-      0.20 * sM7 +
-      0.15 * sVI
-    );
+    const score = (0.35*sRS + 0.30*sM30 + 0.20*sM7 + 0.15*sVI);
 
-    // Confidence: if missing 30D, downweight
     const conf = Number.isFinite(row.ret30) ? 1 : 0.65;
     return clamp(score * conf, 0, 100);
   }
@@ -204,18 +180,122 @@
     return { name: "Neutral", pill: "neutral", hint: "Seitwärts-Regime → selektiv, RS zählt." };
   }
 
+  // ---------- Structure (BOS/CHOCH) ----------
+  function pivots(candles, left = 2, right = 2) {
+    const arr = candles.slice().sort((a,b)=>a.t-b.t);
+    const highs = [];
+    const lows = [];
+
+    for (let i = left; i < arr.length - right; i++) {
+      const h = arr[i].h;
+      const l = arr[i].l;
+
+      let isHigh = true;
+      let isLow = true;
+
+      for (let j = i - left; j <= i + right; j++) {
+        if (j === i) continue;
+        if (arr[j].h >= h) isHigh = false;
+        if (arr[j].l <= l) isLow = false;
+        if (!isHigh && !isLow) break;
+      }
+
+      if (isHigh) highs.push({ i, t: arr[i].t, v: h });
+      if (isLow)  lows.push({ i, t: arr[i].t, v: l });
+    }
+    return { highs, lows, arr };
+  }
+
+  function atr14(candles) {
+    const arr = candles.slice().sort((a,b)=>a.t-b.t);
+    if (arr.length < 16) return NaN;
+
+    const tr = [];
+    for (let i = 1; i < arr.length; i++) {
+      const hi = arr[i].h;
+      const lo = arr[i].l;
+      const prevClose = arr[i-1].c;
+      const trueRange = Math.max(hi - lo, Math.abs(hi - prevClose), Math.abs(lo - prevClose));
+      tr.push(trueRange);
+    }
+    const last14 = tr.slice(-14);
+    return last14.reduce((s,x)=>s+x,0) / last14.length;
+  }
+
+  function breakoutReadiness4H(candles4h, row, cfg) {
+    // Returns: { brs, signals[] }
+    const a = candles4h.slice().sort((x,y)=>x.t-y.t);
+    if (a.length < 80) return { brs: 0, signals: [] };
+
+    const { pivotLeft, pivotRight, compressionAtrDrop } = cfg.APP;
+    const { highs, lows, arr } = pivots(a, pivotLeft, pivotRight);
+    if (highs.length < 2 || lows.length < 2) return { brs: 0, signals: [] };
+
+    const last = arr[arr.length - 1];
+    const lastClose = last.c;
+
+    // last two swings
+    const h1 = highs[highs.length - 1].v;
+    const h0 = highs[highs.length - 2].v;
+    const l1 = lows[lows.length - 1].v;
+    const l0 = lows[lows.length - 2].v;
+
+    const downTrend = (h1 < h0) && (l1 < l0);
+    const upTrend   = (h1 > h0) && (l1 > l0);
+
+    // CHOCH/BOS logic (using close beyond structure, not wick)
+    const chochBull = downTrend && (lastClose > h1);
+    const bosBull   = chochBull && (lastClose > h0);
+
+    const chochBear = upTrend && (lastClose < l1);
+    const bosBear   = chochBear && (lastClose < l0);
+
+    // Compression via ATR drop
+    const recent = arr.slice(-60);        // ~10 days 4H
+    const earlier = arr.slice(-120, -60); // previous ~10 days 4H
+    const atrRecent = atr14(recent);
+    const atrEarlier = atr14(earlier);
+    const comp = Number.isFinite(atrRecent) && Number.isFinite(atrEarlier)
+      ? (atrRecent < atrEarlier * (1 - compressionAtrDrop))
+      : false;
+
+    // Vol confirmation (using our existing volImpulse proxy)
+    const volOk = Number.isFinite(row.volImpulse) ? (row.volImpulse >= 1.2) : false;
+
+    // Score
+    const signals = [];
+    let brs = 0;
+
+    // bullish focus (your use-case: best coins for upside)
+    if (chochBull) { signals.push({ t:"CHOCH↑", cls:"up" }); brs += 35; }
+    if (bosBull)   { signals.push({ t:"BOS↑", cls:"up" });   brs += 30; }
+
+    // we still show bearish signals (info), but they don't add much to the bullish readiness
+    if (chochBear) { signals.push({ t:"CHOCH↓", cls:"down" }); brs += 8; }
+    if (bosBear)   { signals.push({ t:"BOS↓", cls:"down" });   brs += 6; }
+
+    if (comp)  { signals.push({ t:"COMP", cls:"comp" }); brs += 15; }
+    if (volOk) { signals.push({ t:"VOL", cls:"vol" });   brs += 10; }
+
+    brs = clamp(brs, 0, 100);
+    return { brs, signals };
+  }
+
   // ---------- Render ----------
   function render(rows, btc) {
     const sortBy = els.sortSelect.value;
     const minScore = Number(els.minScore.value || 0);
+    const minBRS = Number(els.minBRS.value || 0);
     const q = (els.search.value || "").trim().toUpperCase();
 
     let filtered = rows.filter(r =>
       (Number.isFinite(r.score) ? r.score : 0) >= minScore &&
+      (Number.isFinite(r.brs) ? r.brs : 0) >= minBRS &&
       (q === "" || r.symbol.includes(q))
     );
 
     const sorters = {
+      brs: (a,b) => (b.brs - a.brs),
       score: (a,b) => (b.score - a.score),
       rs30: (a,b) => (b.rs30 - a.rs30),
       ret30: (a,b) => (b.ret30 - a.ret30),
@@ -223,12 +303,13 @@
       volImpulse: (a,b) => (b.volImpulse - a.volImpulse),
       symbol: (a,b) => a.symbol.localeCompare(b.symbol),
     };
-    filtered.sort(sorters[sortBy] || sorters.score);
+    filtered.sort(sorters[sortBy] || sorters.brs);
 
     // KPIs
     const btc30 = btc ? btc.ret30 : NaN;
     els.kpiBtc30.textContent = fmtPct(btc30);
     els.kpiBtc30.className = "kpiValue " + (Number.isFinite(btc30) ? classForSigned(btc30) : "");
+
     const reg = regimeFromBtc(btc30);
     els.kpiRegime.textContent = reg.name;
     els.kpiRegimeHint.textContent = reg.hint;
@@ -236,14 +317,13 @@
     els.statusPill.textContent = reg.name;
     els.statusPill.className = `pill ${reg.pill}`;
 
-    const now = new Date();
-    els.kpiUpdated.textContent = now.toISOString().replace("T"," ").slice(0,19);
+    els.kpiUpdated.textContent = new Date().toISOString().replace("T"," ").slice(0,19);
 
-    // Top candidate
+    // Top candidate (based on BRS primarily, then Score)
     const best = filtered[0];
     if (best) {
       els.topCandidate.textContent = best.symbol;
-      els.topCandidateHint.textContent = `Score ${best.score.toFixed(0)} • RS30 ${fmtPct(best.rs30)} • 30D ${fmtPct(best.ret30)}`;
+      els.topCandidateHint.textContent = `BRS ${best.brs.toFixed(0)} • Score ${best.score.toFixed(0)} • RS30 ${fmtPct(best.rs30)}`;
     } else {
       els.topCandidate.textContent = "—";
       els.topCandidateHint.textContent = "—";
@@ -251,26 +331,36 @@
 
     // Table
     if (!filtered.length) {
-      els.rows.innerHTML = `<tr><td colspan="9" class="loadingRow">Keine Treffer (Filter zu hart?)</td></tr>`;
+      els.rows.innerHTML = `<tr><td colspan="11" class="loadingRow">Keine Treffer (Filter zu hart?)</td></tr>`;
       return;
     }
 
     const body = filtered.map((r, i) => {
       const scoreClass = r.score >= 70 ? "good" : (r.score <= 35 ? "bad" : "neutral");
+      const brsClass = r.brs >= 70 ? "good" : (r.brs <= 25 ? "bad" : "neutral");
+
       const rsClass = Number.isFinite(r.rs30) ? classForSigned(r.rs30) : "";
       const r7Class = Number.isFinite(r.ret7) ? classForSigned(r.ret7) : "";
       const r30Class = Number.isFinite(r.ret30) ? classForSigned(r.ret30) : "";
+
+      const sigHtml = (r.signals && r.signals.length)
+        ? r.signals.map(s => `<span class="signalPill ${s.cls}">${s.t}</span>`).join("")
+        : "—";
 
       return `
         <tr>
           <td class="muted">${i + 1}</td>
           <td><b>${r.symbol}</b><div class="muted" style="font-size:12px;margin-top:2px">${r.pair}</div></td>
+
           <td><span class="badge ${scoreClass}">${r.score.toFixed(0)}</span></td>
+          <td><span class="badge ${brsClass}">${r.brs.toFixed(0)}</span></td>
+          <td class="muted" style="font-size:12px;">${sigHtml}</td>
+
           <td class="${rsClass}">${fmtPct(r.rs30)}</td>
           <td class="${r7Class}">${fmtPct(r.ret7)}</td>
           <td class="${r30Class}">${fmtPct(r.ret30)}</td>
           <td>${fmtNum(r.volImpulse, 2)}×</td>
-          <td>${fmtNum(r.last, 4)}</td>
+          <td>${fmtNum(r.last, 6)}</td>
           <td>${fmtUsd(r.vol24hUsd)}</td>
         </tr>
       `;
@@ -282,8 +372,7 @@
   // ---------- Watchlist Modal ----------
   function openWatchlistModal() {
     const wl = getWatchlist();
-    const lines = wl.map(x => `${x.symbol}=${x.pair}`).join("\n");
-    els.watchlistTextarea.value = lines;
+    els.watchlistTextarea.value = wl.map(x => `${x.symbol}=${x.pair}`).join("\n");
     els.watchlistModal.showModal();
   }
 
@@ -298,13 +387,23 @@
       const [left, right] = line.split("=").map(s => (s || "").trim());
       if (!left) continue;
       const symbol = left.toUpperCase();
-      const pair = (right && right.length) ? right : left.toUpperCase() + "USD";
+      const pair = (right && right.length) ? right : (symbol + "USD");
       items.push({ symbol, pair });
     }
+
     // Ensure BTC exists for RS baseline
     const hasBTC = items.some(x => x.symbol === "BTC");
     if (!hasBTC) items.unshift({ symbol: "BTC", pair: "XXBTZUSD" });
-    return items;
+
+    // unique by symbol
+    const out = [];
+    const seen = new Set();
+    for (const it of items) {
+      if (seen.has(it.symbol)) continue;
+      seen.add(it.symbol);
+      out.push(it);
+    }
+    return out;
   }
 
   // ---------- Load & compute ----------
@@ -314,40 +413,40 @@
     els.errors.textContent = "";
     els.statusPill.textContent = "Loading…";
     els.statusPill.className = "pill";
+    els.rows.innerHTML = `<tr><td colspan="11" class="loadingRow">Loading…</td></tr>`;
 
     const wl = getWatchlist();
-    // ensure unique by symbol
-    const uniq = [];
-    const seen = new Set();
-    for (const x of wl) {
-      if (seen.has(x.symbol)) continue;
-      seen.add(x.symbol);
-      uniq.push(x);
-    }
-
-    els.rows.innerHTML = `<tr><td colspan="9" class="loadingRow">Loading…</td></tr>`;
 
     try {
-      // Fetch OHLC + Ticker per asset with concurrency limit
-      const interval = cfg.APP.ohlcInterval;
+      const dailyInterval = cfg.APP.dailyInterval;
+      const breakoutInterval = cfg.APP.breakoutInterval;
+      const lookback4H = cfg.APP.lookbackCandles4H;
 
       const data = await mapLimit(
-        uniq,
+        wl,
         cfg.APP.maxConcurrentRequests,
         async (asset) => {
-          const [candles, ticker] = await Promise.all([
-            fetchOHLC(asset.pair, interval),
+          // fetch: daily + 4H + ticker
+          const [daily, h4, ticker] = await Promise.all([
+            fetchOHLC(asset.pair, dailyInterval),
+            fetchOHLC(asset.pair, breakoutInterval),
             fetchTicker(asset.pair),
           ]);
 
-          const r = computeReturns(candles);
+          const dailySlice = daily.slice(-Math.max(40, cfg.APP.lookbackDaysDaily + 5));
+          const h4Slice = h4.slice(-Math.max(lookback4H, 140));
+
+          const r = computeReturnsDaily(dailySlice);
+
           const vol24hUsd = ticker.last * ticker.vol24hBase;
           const avgVol30 = r.avgVol30;
+
           const volImpulse = (Number.isFinite(avgVol30) && avgVol30 > 0)
             ? (ticker.vol24hBase / avgVol30)
             : NaN;
 
-          return {
+          // placeholder row (needed for volOk within BRS)
+          const row = {
             symbol: asset.symbol,
             pair: asset.pair,
             last: ticker.last,
@@ -357,26 +456,37 @@
             ret7: r.ret7,
             ret30: r.ret30,
             volImpulse,
+            rs30: NaN,
+            score: 0,
+            brs: 0,
+            signals: [],
           };
+
+          // BRS from 4H structure + compression
+          const br = breakoutReadiness4H(h4Slice, row, cfg);
+          row.brs = br.brs;
+          row.signals = br.signals;
+
+          return row;
         }
       );
 
       const btc = data.find(x => x.symbol === "BTC") || data.find(x => x.pair === "XXBTZUSD");
       if (!btc) throw new Error("BTC baseline missing (add BTC=XXBTZUSD to watchlist).");
 
-      // compute RS and score
+      // compute RS and Market Score
       for (const row of data) {
         row.rs30 = Number.isFinite(row.ret30) && Number.isFinite(btc.ret30)
           ? (row.ret30 - btc.ret30)
           : NaN;
-        row.score = computeScore(row, btc);
+        row.score = computeMarketScore(row, btc);
       }
 
       render(data, btc);
 
     } catch (e) {
       els.errors.textContent = String(e?.message || e);
-      els.rows.innerHTML = `<tr><td colspan="9" class="loadingRow">Fehler beim Laden. Details oben rechts.</td></tr>`;
+      els.rows.innerHTML = `<tr><td colspan="11" class="loadingRow">Fehler beim Laden. Details oben rechts.</td></tr>`;
       els.statusPill.textContent = "Error";
       els.statusPill.className = "pill bad";
     }
@@ -404,14 +514,11 @@
   // ---------- Events ----------
   els.btnRefresh.addEventListener("click", load);
   els.sortSelect.addEventListener("change", load);
-  els.minScore.addEventListener("input", () => {
-    // re-render without refetch: simplest = reload for now (keeps MVP simple)
-    load();
-  });
-  els.search.addEventListener("input", () => {
-    // same: reload for now; later we can cache rows and filter client-side only
-    load();
-  });
+
+  // For MVP: re-load on filter changes (simple + consistent)
+  els.minScore.addEventListener("input", load);
+  els.minBRS.addEventListener("input", load);
+  els.search.addEventListener("input", load);
 
   els.btnEditWatchlist.addEventListener("click", openWatchlistModal);
 
