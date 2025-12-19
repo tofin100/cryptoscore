@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CryptoScore — Kraken Breakout Radar</title>
-  <meta name="description" content="CryptoScore: Score & Breakout-Readiness (BOS/CHOCH) basierend auf Kraken Marktdaten." />
+  <title>MicroCap VC Scanner — 100x Discovery</title>
+  <meta name="description" content="MicroCap VC Scanner: finde asymmetrische Microcaps (Tokenomics + Liquidity + Momentum) über CoinGecko." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -16,20 +16,15 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="logo">CS</div>
+      <div class="logo">VC</div>
       <div class="brandText">
-        <div class="brandTitle">CryptoScore</div>
-        <div class="brandSub">Kraken • Market Score + Breakout Readiness (BRS)</div>
+        <div class="brandTitle">MicroCap VC Scanner</div>
+        <div class="brandSub">CoinGecko • Asymmetry + Liquidity + Momentum (Root-only)</div>
       </div>
     </div>
 
     <div class="topActions">
-      <button id="btnEditWatchlist" class="btn ghost" title="Watchlist bearbeiten">
-        Watchlist
-      </button>
-      <button id="btnRefresh" class="btn primary" title="Daten neu laden">
-        Refresh
-      </button>
+      <button id="btnReload" class="btn primary">Scan</button>
     </div>
   </header>
 
@@ -38,22 +33,22 @@
       <div class="heroCard">
         <div class="heroHeader">
           <div>
-            <div class="heroTitle">Market Regime</div>
-            <div class="heroHint">BTC Trend (Daily) + Risiko-Modus (MVP)</div>
+            <div class="heroTitle">Ziel</div>
+            <div class="heroHint">Microcaps finden, die überhaupt 10–100x-fähig sind (VC-Due-Diligence-Score).</div>
           </div>
-          <div id="statusPill" class="pill">Loading…</div>
+          <div id="statusPill" class="pill">Ready</div>
         </div>
 
         <div class="kpis">
           <div class="kpi">
-            <div class="kpiLabel">BTC 30D</div>
-            <div id="kpiBtc30" class="kpiValue">—</div>
-            <div id="kpiBtc30Hint" class="kpiHint">Daily close vs 30d ago</div>
+            <div class="kpiLabel">Universe</div>
+            <div id="kpiUniverse" class="kpiValue">—</div>
+            <div class="kpiHint">Coins im Scan</div>
           </div>
           <div class="kpi">
-            <div class="kpiLabel">Regime</div>
-            <div id="kpiRegime" class="kpiValue">—</div>
-            <div id="kpiRegimeHint" class="kpiHint">Wird aus BTC Trend abgeleitet</div>
+            <div class="kpiLabel">Filters</div>
+            <div id="kpiFilters" class="kpiValue">—</div>
+            <div class="kpiHint">MC / Vol / FDV</div>
           </div>
           <div class="kpi">
             <div class="kpiLabel">Last Update</div>
@@ -64,19 +59,11 @@
 
         <div class="divider"></div>
 
-        <div class="heroFooter">
-          <div class="mini">
-            <div class="miniTitle">Was du hier siehst</div>
-            <div class="miniText">
-              <b>Score</b> = Momentum/RS/Volumen (wer ist gerade stark).<br/>
-              <b>BRS</b> = Breakout-Readiness (CHOCH/BOS/Kompression) → wer ist „bereit“, bevor es abgeht.
-            </div>
-          </div>
-
-          <div class="mini">
-            <div class="miniTitle">Top Candidate</div>
-            <div id="topCandidate" class="miniBig">—</div>
-            <div id="topCandidateHint" class="miniText">—</div>
+        <div class="mini">
+          <div class="miniTitle">Wie du das liest</div>
+          <div class="miniText">
+            <b>VC Score</b> = Asymmetry (Supply/FDV/MC) + Liquidity (Vol/MC) + Timing (Momentum) − Risiko (ATH/Dead).<br/>
+            <b>Wichtig:</b> Das ist Discovery. Danach kommt manuelle Due Diligence (Team, Produkt, Unlocks, Konkurrenz).
           </div>
         </div>
       </div>
@@ -84,51 +71,53 @@
       <div class="heroCard">
         <div class="heroHeader">
           <div>
-            <div class="heroTitle">Controls</div>
-            <div class="heroHint">Sortieren, filtern, Fokus setzen</div>
+            <div class="heroTitle">Filter</div>
+            <div class="heroHint">Brutal filtern, sonst findest du nur Müll.</div>
           </div>
+          <div id="errors" class="errors" aria-live="polite"></div>
         </div>
 
         <div class="controlsGrid">
           <div class="control">
-            <label class="label" for="sortSelect">Sortierung</label>
-            <select id="sortSelect" class="select">
-              <option value="brs">BRS (desc) — Breakout</option>
-              <option value="score">Score (desc) — Momentum</option>
-              <option value="rs30">RS vs BTC 30D (desc)</option>
-              <option value="ret30">Return 30D (desc)</option>
-              <option value="ret7">Return 7D (desc)</option>
-              <option value="volImpulse">Vol-Impuls (desc)</option>
-              <option value="symbol">Symbol (A→Z)</option>
+            <label class="label">Market Cap max</label>
+            <input id="mcMax" class="input" type="number" step="1000000" />
+          </div>
+          <div class="control">
+            <label class="label">Market Cap min</label>
+            <input id="mcMin" class="input" type="number" step="100000" />
+          </div>
+          <div class="control">
+            <label class="label">24h Volume min</label>
+            <input id="volMin" class="input" type="number" step="10000" />
+          </div>
+          <div class="control">
+            <label class="label">FDV/MC max</label>
+            <input id="fdvMcMax" class="input" type="number" step="0.1" />
+          </div>
+          <div class="control">
+            <label class="label">Min VC Score</label>
+            <input id="minScore" class="input" type="number" min="0" max="100" step="1" />
+          </div>
+          <div class="control">
+            <label class="label">Suche</label>
+            <input id="search" class="input" placeholder="z.B. ondo, pendle, inj…" />
+          </div>
+
+          <div class="control" style="grid-column: 1 / -1;">
+            <label class="label">Sortierung</label>
+            <select id="sort" class="select">
+              <option value="score">VC Score (desc)</option>
+              <option value="mc">Market Cap (asc)</option>
+              <option value="volmc">Vol/MC (desc)</option>
+              <option value="fdvmc">FDV/MC (asc)</option>
+              <option value="chg7">Change 7d (desc)</option>
+              <option value="chg30">Change 30d (desc)</option>
             </select>
-          </div>
-
-          <div class="control">
-            <label class="label" for="minBRS">Min BRS</label>
-            <input id="minBRS" class="input" type="number" min="0" max="100" step="1" value="0" />
-          </div>
-
-          <div class="control">
-            <label class="label" for="minScore">Min Score</label>
-            <input id="minScore" class="input" type="number" min="0" max="100" step="1" value="0" />
-          </div>
-
-          <div class="control">
-            <label class="label" for="search">Suche</label>
-            <input id="search" class="input" placeholder="z.B. SOL, LINK, AVAX…" />
-          </div>
-
-          <div class="control">
-            <label class="label" for="autoRefresh">Auto Refresh</label>
-            <div class="toggleRow">
-              <input id="autoRefresh" type="checkbox" />
-              <span class="toggleHint">alle <span id="autoRefreshMins">10</span> min</span>
-            </div>
           </div>
         </div>
 
         <div class="note">
-          Tipp: Sortiere nach <b>BRS</b>, um frühe Struktur-Setups zu sehen. Sortiere nach <b>Score</b>, wenn du bestätigtes Momentum willst.
+          Tipp: Für „echte Microcaps“ setze MC max z.B. auf 300M und Vol min z.B. auf 500k–2M.
         </div>
       </div>
     </section>
@@ -137,75 +126,43 @@
       <div class="panelHead">
         <div>
           <h2 class="panelTitle">Ranking</h2>
-          <div class="panelSub">
-            Daten: Kraken Public REST (OHLC Daily + OHLC 4H + Ticker). BRS = CHOCH/BOS/Kompression (4H).
-          </div>
-        </div>
-
-        <div class="panelRight">
-          <div id="errors" class="errors" aria-live="polite"></div>
+          <div class="panelSub">Quelle: CoinGecko markets (USD). Optional: narratives.json für manuelle Narrative-Tags.</div>
         </div>
       </div>
 
       <div class="tableWrap">
-        <table class="table" aria-label="CryptoScore Ranking Table">
+        <table class="table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Asset</th>
-              <th>Score</th>
-              <th>BRS</th>
-              <th>Signals (4H)</th>
-              <th>RS vs BTC (30D)</th>
-              <th>Return 7D</th>
-              <th>Return 30D</th>
-              <th>Vol-Impuls</th>
-              <th>Price</th>
-              <th>24h Vol (approx)</th>
+              <th>Coin</th>
+              <th>VC Score</th>
+              <th>Asym</th>
+              <th>Liqui</th>
+              <th>Timing</th>
+              <th>Risk</th>
+              <th>MC</th>
+              <th>FDV</th>
+              <th>FDV/MC</th>
+              <th>Circ%</th>
+              <th>Vol/MC</th>
+              <th>Chg 7d</th>
+              <th>Chg 30d</th>
+              <th>ATH Δ</th>
+              <th>Preis</th>
             </tr>
           </thead>
           <tbody id="rows">
-            <tr>
-              <td colspan="11" class="loadingRow">Loading…</td>
-            </tr>
+            <tr><td colspan="16" class="loadingRow">Klicke „Scan“…</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="footerHint">
-        <span class="muted">
-          *BRS v1 nutzt 4H-Structure (CHOCH/BOS), ATR-Kompression (Proxy) und optional Vol-Impuls. Daily-Regime kommt über BTC 30D.
-        </span>
+        <span class="muted">Hinweis: CoinGecko hat Rate-Limits. Wenn du zu viele Coins scannst, reduziere „perPage“ in config.js.</span>
       </div>
     </section>
   </main>
-
-  <!-- Watchlist Modal -->
-  <dialog id="watchlistModal" class="modal">
-    <form method="dialog" class="modalCard">
-      <div class="modalHead">
-        <div>
-          <div class="modalTitle">Watchlist bearbeiten</div>
-          <div class="modalSub">
-            Ein Symbol pro Zeile. Format: <b>SYMBOL</b> oder <b>SYMBOL=KRAKENPAIR</b><br/>
-            Beispiel: <code>SOL=SOLUSD</code> oder <code>BTC=XXBTZUSD</code>
-          </div>
-        </div>
-        <button class="iconBtn" value="cancel" aria-label="Schließen">✕</button>
-      </div>
-
-      <textarea id="watchlistTextarea" class="textarea" spellcheck="false"></textarea>
-
-      <div class="modalActions">
-        <button id="btnResetWatchlist" class="btn ghost" value="cancel" type="button">Reset</button>
-        <button id="btnSaveWatchlist" class="btn primary" value="default" type="button">Save</button>
-      </div>
-
-      <div class="modalFoot">
-        Speichert in <b>localStorage</b>. Repo-Defaults in <code>config.js</code>.
-      </div>
-    </form>
-  </dialog>
 
   <script src="./config.js"></script>
   <script src="./app.js"></script>
